@@ -45,5 +45,5 @@ flutter {
 }
 
 dependencies {
-    implementation("com.alphacephei:vosk-android:0.3.30")
+    implementation("com.alphacephei:vosk-android:0.3.50")
 }
