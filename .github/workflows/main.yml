@@ -15,46 +15,43 @@ jobs:
       - uses: actions/checkout@v4
       
       # Fix permission issues that sometimes happen in containers
-      - name: Fix Directory Permissions
-        run: git config --global --add safe.directory '*'
-      
       - name: Build and Verify
         run: |
-          # 1. Verify Environment
-          echo "Current User: $(whoami)"
+          # 1. Ownership & Permissions (Fixes "dubious ownership" git error)
+          git config --global --add safe.directory "$GITHUB_WORKSPACE/buddy_assistant"
+          
+          # 2. Check Environment
           flutter doctor -v
           
-          # 2. Create Project
-          # Using --platforms android to force it.
-          echo "Creating Project..."
-          flutter create build_env --template=app --org com.example --project-name buddy_assistant --platforms android -v
+          # 3. Enable Android (Just in case)
+          flutter config --enable-android
           
-          # 3. CRITICAL DEBUG: What did it create?
-          echo "Listing build_env content:"
-          ls -R build_env
+          # 4. "Repair" / "Add Platform" Strategy
+          # Instead of creating a new folder, we tell Flutter:
+          # "This current directory IS a project. Please add Android to it."
+          echo "Repairing/Adding Android platform..."
+          flutter create --platforms android . -v > create.log 2>&1 || true
           
-          # 4. Fail if Android missing
-          if [ ! -d "build_env/android" ]; then
-             echo "ERROR: Android folder missing even in Docker!"
+          # Debug: Show us what happened
+          cat create.log
+          
+          # 5. Fail if Android missing
+          if [ ! -f "android/app/build.gradle" ]; then
+             echo "#############################################"
+             echo "CRITICAL: 'flutter create .' failed to generate android files!"
+             echo "Contents of android/:"
+             ls -R android
+             echo "#############################################"
              exit 1
           fi
           
-          # 5. Migrate Code
-          cp -r buddy_assistant/lib build_env/
-          cp -r buddy_assistant/assets build_env/
-          cp buddy_assistant/pubspec.yaml build_env/
-          
-          # Merge Native Code
-          mkdir -p build_env/android/app/src/main
-          cp -r buddy_assistant/android/app/src/main/* build_env/android/app/src/main/
-          
           # 6. Inject Dependencies
-          sed -i 's/dependencies {/dependencies {\n    implementation "com.alphacephei:vosk-android:0.3.30"/' build_env/android/app/build.gradle
-          sed -i 's/defaultConfig {/defaultConfig {\n        multiDexEnabled true/' build_env/android/app/build.gradle
+          echo "Injecting Gradle dependencies..."
+          sed -i 's/dependencies {/dependencies {\n    implementation "com.alphacephei:vosk-android:0.3.30"/' android/app/build.gradle
+          sed -i 's/defaultConfig {/defaultConfig {\n        multiDexEnabled true/' android/app/build.gradle
           
-          # 5. Build
-          echo "Building..."
-          cd build_env
+          # 7. Build
+          echo "Building APK..."
           flutter pub get
           flutter build apk --debug
           
@@ -62,4 +59,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: buddy-assistant-release
-          path: build_env/build/app/outputs/flutter-apk/app-debug.apk
+          path: build/app/outputs/flutter-apk/app-debug.apk
