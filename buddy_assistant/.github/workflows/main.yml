@@ -1,0 +1,64 @@
+name: Build Buddy APK
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: actions/setup-java@v3
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+          
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          
+      - run: flutter pub get
+      
+      # Adding a dummy key.properties if needed, but for debug release it's optional.
+      # We are building release but unsigned (or signed with debug key by default if not specified).
+      # For simplicity we'll let Flutter use the default debug signing for the release build 
+      # or we can just build apk --debug if strict release signing is an issue.
+      # However, "flutter build apk --release" works fine with default keys for personal use.
+      - run: flutter pub get
+      
+      # SCAFFOLDING MAGIC:
+      # We move our custom code aside, generate a fresh app, and move code back.
+      # This ensures we have all Gradle files without needing Android Studio.
+      - name: Scaffold Project
+        run: |
+          mkdir temp_custom
+          mv lib temp_custom/
+          mv android temp_custom/
+          mv pubspec.yaml temp_custom/
+          mv assets temp_custom/
+          
+          # Create fresh flutter app
+          flutter create . --org com.example --project-name buddy_assistant
+          
+          # Remove generated lib and test
+          rm -rf lib test
+          
+          # Restore our code (merges android folder)
+          cp -r temp_custom/* .
+          
+      # DEPENDENCY INJECTION:
+      # We need Vosk in the native Gradle file.
+      - name: Inject Vosk Dependency
+        run: |
+          sed -i 's/dependencies {/dependencies {\n    implementation "com.alphacephei:vosk-android:0.3.30"/' android/app/build.gradle
+          # Enable MultiDex if needed (usually fine for small apps, but Vosk is big)
+          sed -i 's/defaultConfig {/defaultConfig {\n        multiDexEnabled true/' android/app/build.gradle
+
+      - run: flutter pub get
+      - run: flutter build apk --debug
+      
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: buddy-assistant-release
+          path: build/app/outputs/flutter-apk/app-debug.apk

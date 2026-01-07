@@ -1,0 +1,26 @@
+{
+  "routines": {
+    "good morning": [
+      "read_weather",
+      "read_time",
+      "volume_up",
+      "tell_joke"
+    ],
+    "good night": [
+      "silent_mode",
+      "set_alarm_7am",
+      "turn_off_wifi"
+    ],
+    "work mode": [
+      "dnd_on",
+      "volume_down"
+    ]
+  },
+  "contacts": {
+    "mom": "1234567890",
+    "dad": "0987654321",
+    "emergency": "911"
+  },
+  "debug_mode": true,
+  "gemini_api_key": "YOUR_API_KEY_HERE"
+}
