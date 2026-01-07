@@ -30,29 +30,31 @@ jobs:
           
       - name: Build and Verify
         run: |
-          # 1. Accept Licenses (Standard Android Command)
+          # 1. Accept Licenses
           yes | flutter doctor --android-licenses || true
           
-          # 2. Configure Environment
+          # 2. Precache Android Artifacts
+          flutter precache --android
+          
+          # 3. Configure Environment
           flutter config --no-analytics
           flutter config --enable-android
           flutter doctor -v
           
-          # 3. Create Project
-          # Using 'app' template to ensure minimal valid structure
+          # 4. Create Project
           flutter create build_env --template=app --org com.example --project-name buddy_assistant --platforms android
           
-          # 4. Debug Output
+          # 5. Debug Output
           echo "Checking build_env/android structure:"
           ls -R build_env/android || echo "Android folder missing!"
           
-          # 5. Fail Fast
+          # 6. Fail Fast
           if [ ! -f "build_env/android/app/build.gradle" ]; then
              echo "CRITICAL: build.gradle is missing. Scaffolding failed."
              exit 1
           fi
           
-          # 6. Merge Code
+          # 7. Merge Code
           rm -rf build_env/lib
           cp -r lib build_env/
           cp -r assets build_env/
@@ -64,11 +66,11 @@ jobs:
           # Merge Native Code
           cp -r android/app/src/main/* build_env/android/app/src/main/
           
-          # 7. Inject Dependencies
+          # 8. Inject Dependencies
           sed -i 's/dependencies {/dependencies {\n    implementation "com.alphacephei:vosk-android:0.3.30"/' build_env/android/app/build.gradle
           sed -i 's/defaultConfig {/defaultConfig {\n        multiDexEnabled true/' build_env/android/app/build.gradle
           
-          # 8. Build
+          # 9. Build
           cd build_env
           flutter pub get
           flutter build apk --debug
