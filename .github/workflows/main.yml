@@ -20,35 +20,35 @@ jobs:
       
       - name: Build and Verify
         run: |
-          # 1. Verify Environment (Everything should be pre-installed)
+          # 1. Verify Environment
+          echo "Current User: $(whoami)"
           flutter doctor -v
           
           # 2. Create Project
-          # Using the container, this MUST work.
-          flutter create build_env --org com.example --project-name buddy_assistant --platforms android
+          # Using --platforms android to force it.
+          echo "Creating Project..."
+          flutter create build_env --template=app --org com.example --project-name buddy_assistant --platforms android -v
           
-          # 3. Migrate Code
-          echo "Migrating Source Code..."
+          # 3. CRITICAL DEBUG: What did it create?
+          echo "Listing build_env content:"
+          ls -R build_env
           
-          # Clean default lib
-          rm -rf build_env/lib
+          # 4. Fail if Android missing
+          if [ ! -d "build_env/android" ]; then
+             echo "ERROR: Android folder missing even in Docker!"
+             exit 1
+          fi
           
-          # Copy our code (buddy_assistant is at root now because we moved .github up)
-          # Wait, in the docker container, the checkout path might be different?
-          # Standard checkout puts files in $GITHUB_WORKSPACE.
-          # We operate relative to that.
-          
+          # 5. Migrate Code
           cp -r buddy_assistant/lib build_env/
           cp -r buddy_assistant/assets build_env/
           cp buddy_assistant/pubspec.yaml build_env/
           
           # Merge Native Code
-          # Ensure target dir exists
           mkdir -p build_env/android/app/src/main
           cp -r buddy_assistant/android/app/src/main/* build_env/android/app/src/main/
           
-          # 4. Inject Dependencies
-          echo "Injecting Dependencies..."
+          # 6. Inject Dependencies
           sed -i 's/dependencies {/dependencies {\n    implementation "com.alphacephei:vosk-android:0.3.30"/' build_env/android/app/build.gradle
           sed -i 's/defaultConfig {/defaultConfig {\n        multiDexEnabled true/' build_env/android/app/build.gradle
           
