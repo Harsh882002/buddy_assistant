@@ -31,17 +31,28 @@ jobs:
       
       - name: Setup and Build
         run: |
-          # 1. Diagnostics: Why is Android missing?
-          flutter doctor -v
+          # 1. Environment Check
+          echo "Android SDK Root: $ANDROID_SDK_ROOT"
+          echo "Java Home: $JAVA_HOME"
           
-          # 2. Configure & Create (Force Android)
+          # 2. Accept Licenses (Crucial for Android Toolchain)
+          yes | flutter doctor --android-licenses || true
+          
+          # 3. Create Project (Verbose to see why Android might be skipped)
           flutter config --enable-android
-          flutter create fresh_build --org com.example --project-name buddy_assistant --platforms android
+          flutter create fresh_build --org com.example --project-name buddy_assistant --platforms android -v
           
           # Debug: Verify structure
-          ls -R fresh_build
+          echo "Listing fresh_build root:"
+          ls -F fresh_build
           
-          # 3. Copy OUR code into the fresh project
+          # Fail fast if Android is missing
+          if [ ! -d "fresh_build/android" ]; then
+            echo "ERROR: Android folder was NOT created!"
+            exit 1
+          fi
+          
+          # 4. Copy OUR code into the fresh project
           # Overwrite lib
           rm -rf fresh_build/lib
           cp -r lib fresh_build/
@@ -53,10 +64,6 @@ jobs:
           cp pubspec.yaml fresh_build/
           
           # Merge Android Native Code
-          # We primarily want to overwrite AndroidManifest and add our Kotlin files.
-          # The structure in our repo: android/app/src/main/...
-          # The target: fresh_build/android/app/src/main/...
-          # We force copy to ensure we update the generated files
           cp -r android/app/src/main/* fresh_build/android/app/src/main/
           
           # 3. Inject Dependencies (into the FRESH project)
