@@ -31,17 +31,17 @@ jobs:
       
       - name: Setup and Build
         run: |
-          # 0. Configure Flutter to ensure Android is enabled
+          # 1. Diagnostics: Why is Android missing?
+          flutter doctor -v
+          
+          # 2. Configure & Create (Force Android)
           flutter config --enable-android
+          flutter create fresh_build --org com.example --project-name buddy_assistant --platforms android
           
-          # 1. Create a fresh Flutter project
-          # Removing --platforms flag to let it generate everything default, just in case
-          flutter create fresh_build --org com.example --project-name buddy_assistant
-          
-          # Debug: Check if android folder exists
+          # Debug: Verify structure
           ls -R fresh_build
           
-          # 2. Copy OUR code into the fresh project
+          # 3. Copy OUR code into the fresh project
           # Overwrite lib
           rm -rf fresh_build/lib
           cp -r lib fresh_build/
