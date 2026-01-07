@@ -2,61 +2,42 @@ name: Build Buddy APK
 on: [push]
 jobs:
   build:
-    # Use a pre-configured Docker container with everything installed.
-    # This is the "Nuclear Option" for stability.
     runs-on: ubuntu-latest
-    container:
-      image: ghcr.io/cirruslabs/flutter:stable
-      
     permissions:
       contents: write
-      
+    defaults:
+      run:
+        working-directory: ./buddy_assistant
+
     steps:
       - uses: actions/checkout@v4
       
-      # Fix permission issues that sometimes happen in containers
+      - uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+          
       - name: Build and Verify
         run: |
-          # 1. Ownership & Permissions (Fixes "dubious ownership" git error)
-          git config --global --add safe.directory "$GITHUB_WORKSPACE/buddy_assistant"
-          
-          # 2. Check Environment
-          flutter doctor -v
-          
-          # 3. Enable Android (Just in case)
-          flutter config --enable-android
-          
-          # 4. "Repair" / "Add Platform" Strategy
-          # Instead of creating a new folder, we tell Flutter:
-          # "This current directory IS a project. Please add Android to it."
-          echo "Repairing/Adding Android platform..."
-          flutter create --platforms android . -v > create.log 2>&1 || true
-          
-          # Debug: Show us what happened
-          cat create.log
-          
-          # 5. Fail if Android missing
-          if [ ! -f "android/app/build.gradle" ]; then
-             echo "#############################################"
-             echo "CRITICAL: 'flutter create .' failed to generate android files!"
-             echo "Contents of android/:"
-             ls -R android
-             echo "#############################################"
-             exit 1
-          fi
-          
-          # 6. Inject Dependencies
-          echo "Injecting Gradle dependencies..."
-          sed -i 's/dependencies {/dependencies {\n    implementation "com.alphacephei:vosk-android:0.3.30"/' android/app/build.gradle
-          sed -i 's/defaultConfig {/defaultConfig {\n        multiDexEnabled true/' android/app/build.gradle
-          
-          # 7. Build
           echo "Building APK..."
+          
+          # 1. Accept Licenses (Good practice in CI)
+          yes | flutter doctor --android-licenses || true
+          
+          # 2. Get Dependencies
           flutter pub get
+          
+          # 3. Build
+          # We already have the android folder and build.gradle configured!
           flutter build apk --debug
           
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: buddy-assistant-release
-          path: build/app/outputs/flutter-apk/app-debug.apk
+          path: buddy_assistant/build/app/outputs/flutter-apk/app-debug.apk

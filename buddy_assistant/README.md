@@ -17,19 +17,35 @@ To get your APK, you do NOT need to install anything on your laptop (except Git)
    git push -u origin master
    ```
 
-## 3. Building the APK
-1. Go to your GitHub Repository page.
-2. Click the **Actions** tab.
-3. You should see a workflow running named "Build Buddy APK".
-4. Wait for it to turn Green (approx 5-8 minutes).
-5. Click on the workflow run.
-6. Scroll down to **Artifacts** section.
-7. Click **buddy-assistant-release** to download the ZIP.
+## 📱 Installation
 
-## 4. Installation
-1. Unzip the downloaded file to get `app-debug.apk`.
-2. Send this APK to your phone (USB, Drive, WhatsApp, etc.).
-3. Tap to install. (Allow "Install from Unknown Sources").
+### Option 1: Download from GitHub Actions (Automated)
+1.  Go to the **Actions** tab in this repository.
+2.  Click on the latest **"Build Buddy APK"** run.
+3.  Scroll down to the **Artifacts** section.
+4.  Download **`buddy-assistant-release`**.
+5.  Unzip the file to find `app-debug.apk`.
+6.  Transfer to your phone and install.
+
+### Option 2: Build Locally (Reliable Alternative)
+If the automated build fails or if you prefer to build it yourself:
+
+1.  **Install Flutter:** [Download Flutter SDK](https://docs.flutter.dev/get-started/install)
+2.  **Open Terminal/Command Prompt** in this project folder.
+3.  **Run the following commands:**
+    ```bash
+    # 1. Get dependencies
+    flutter pub get
+    
+    # 2. Add Android platform support (if missing)
+    flutter create --platforms android .
+    
+    # 3. Build the APK
+    flutter build apk --debug
+    ```
+4.  **Find the APK:**
+    The file will be at: `build/app/outputs/flutter-apk/app-debug.apk`
+5.  **Transfer & Install.**
 4. **IMPORTANT**:
    - Open the App.
    - Accept ALL permissions (Microphone, Phone, Notification).
