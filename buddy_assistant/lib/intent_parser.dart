@@ -38,7 +38,7 @@ class IntentParser {
        final time = DateTime.now();
        SystemControl.speak("It is ${time.hour}:${time.minute}");
     }
-    // Add more routines here
+    else {
       DebugLogger().log("Unknown intent: $input");
       _handleAIFallback(input);
     }
