@@ -29,55 +29,40 @@ jobs:
       # However, "flutter build apk --release" works fine with default keys for personal use.
       - run: flutter pub get
       
-      # SCAFFOLDING MAGIC:
-      - name: Scaffold Project
+      - name: Setup and Build
         run: |
-          # Debug initial state
-          ls -R
+          # 1. Create a fresh Flutter project in a temp directory
+          flutter create fresh_build --org com.example --project-name buddy_assistant --platforms android
           
-          # 1. Back up our custom code
-          mkdir temp_custom
-          mv lib temp_custom/
-          mv android temp_custom/
-          mv pubspec.yaml temp_custom/
-          mv assets temp_custom/
+          # 2. Copy OUR code into the fresh project
+          # Overwrite lib
+          rm -rf fresh_build/lib
+          cp -r lib fresh_build/
           
-          # 2. Scaffolding: Create fresh flutter app
-          flutter create . --org com.example --project-name buddy_assistant --platforms android
+          # Copy assets
+          cp -r assets fresh_build/
           
-          # Debug after scaffold
-          ls -R
+          # Overwrite pubspec
+          cp pubspec.yaml fresh_build/
           
-          # 3. Clean generic code
-          rm -rf lib test
+          # Merge Android Native Code
+          # We primarily want to overwrite AndroidManifest and add our Kotlin files.
+          # The structure in our repo: android/app/src/main/...
+          # The target: fresh_build/android/app/src/main/...
+          cp -r android/app/src/main/* fresh_build/android/app/src/main/
           
-          # 4. Restore/Merge our code
-          # Restore lib (folder replacement)
-          cp -r temp_custom/lib .
-          # Restore assets (folder replacement)
-          cp -r temp_custom/assets .
-          # Restore pubspec (file replacement)
-          cp temp_custom/pubspec.yaml .
+          # 3. Inject Dependencies (into the FRESH project)
+          # Now we are sure build.gradle exists because it's a fresh create.
+          sed -i 's/dependencies {/dependencies {\n    implementation "com.alphacephei:vosk-android:0.3.30"/' fresh_build/android/app/build.gradle
+          sed -i 's/defaultConfig {/defaultConfig {\n        multiDexEnabled true/' fresh_build/android/app/build.gradle
           
-          # Merge Android (files inside folders)
-          # We copy contents of temp_custom/android into current android/
-          cp -r temp_custom/android/. android/
+          # 4. Build
+          cd fresh_build
+          flutter pub get
+          flutter build apk --debug
           
-      # DEPENDENCY INJECTION:
-      - name: Inject Vosk Dependency
-        run: |
-          # Verify file exists
-          ls -l android/app/build.gradle
-          
-          # Inject Dependencies
-          sed -i 's/dependencies {/dependencies {\n    implementation "com.alphacephei:vosk-android:0.3.30"/' android/app/build.gradle
-          sed -i 's/defaultConfig {/defaultConfig {\n        multiDexEnabled true/' android/app/build.gradle
-
-      - run: flutter pub get
-      - run: flutter build apk --debug
-      
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: buddy-assistant-release
-          path: build/app/outputs/flutter-apk/app-debug.apk
+          path: buddy_assistant/fresh_build/build/app/outputs/flutter-apk/app-debug.apk
