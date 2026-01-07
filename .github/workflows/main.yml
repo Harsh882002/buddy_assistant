@@ -15,7 +15,14 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '17'
-          
+      
+      # RELIABLE SDK SETUP
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          cmdline-tools-version: 11076708
+          log-warning: false
+
       - uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
@@ -23,37 +30,29 @@ jobs:
           
       - name: Build and Verify
         run: |
-          # 1. Setup Android SDK Tools explicitly
-          # Ubuntu runners have SDK, but sometimes missing specific tools Flutter wants.
-          echo "Updating Android SDK..."
-          yes | sdkmanager --install "platform-tools" "platforms;android-34" "build-tools;34.0.0"
-          
-          # 2. Accept Licenses
+          # 1. Accept Licenses (Standard Android Command)
           yes | flutter doctor --android-licenses || true
           
-          # 3. Precache Android Artifacts (Forces Flutter to download Gradle wrapper etc)
-          flutter precache --android
-          
-          # 4. Configure Environment
+          # 2. Configure Environment
           flutter config --no-analytics
           flutter config --enable-android
           flutter doctor -v
           
-          # 5. Create Project (Explicitly 'app' template)
-          # We use a standard name 'build_env'
+          # 3. Create Project
+          # Using 'app' template to ensure minimal valid structure
           flutter create build_env --template=app --org com.example --project-name buddy_assistant --platforms android
           
-          # 6. Debug Output
+          # 4. Debug Output
           echo "Checking build_env/android structure:"
           ls -R build_env/android || echo "Android folder missing!"
           
-          # 7. Fail Fast
+          # 5. Fail Fast
           if [ ! -f "build_env/android/app/build.gradle" ]; then
              echo "CRITICAL: build.gradle is missing. Scaffolding failed."
              exit 1
           fi
           
-          # 8. Merge Code
+          # 6. Merge Code
           rm -rf build_env/lib
           cp -r lib build_env/
           cp -r assets build_env/
@@ -65,11 +64,11 @@ jobs:
           # Merge Native Code
           cp -r android/app/src/main/* build_env/android/app/src/main/
           
-          # 9. Inject Dependencies
+          # 7. Inject Dependencies
           sed -i 's/dependencies {/dependencies {\n    implementation "com.alphacephei:vosk-android:0.3.30"/' build_env/android/app/build.gradle
           sed -i 's/defaultConfig {/defaultConfig {\n        multiDexEnabled true/' build_env/android/app/build.gradle
           
-          # 10. Build
+          # 8. Build
           cd build_env
           flutter pub get
           flutter build apk --debug
