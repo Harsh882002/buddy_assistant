@@ -3,9 +3,6 @@ on: [push]
 jobs:
   build:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./buddy_assistant
     permissions:
       contents: write
     steps:
@@ -16,7 +13,6 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
       
-      # RELIABLE SDK SETUP
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
         with:
@@ -30,48 +26,54 @@ jobs:
           
       - name: Build and Verify
         run: |
-          # 1. Accept Licenses
+          # 1. Environment & Tools
           yes | flutter doctor --android-licenses || true
-          
-          # 2. Precache Android Artifacts
-          flutter precache --android
-          
-          # 3. Configure Environment
           flutter config --no-analytics
           flutter config --enable-android
           flutter doctor -v
           
-          # 4. Create Project
-          flutter create build_env --template=app --org com.example --project-name buddy_assistant --platforms android
+          # 2. Create Clean Project (Sibling to 'buddy_assistant')
+          # structure:
+          #   / (root)
+          #   ├── buddy_assistant/ (YOUR CODE)
+          #   └── android_build/   (FRESH APP)
           
-          # 5. Debug Output
-          echo "Checking build_env/android structure:"
-          ls -R build_env/android || echo "Android folder missing!"
+          echo "Creating fresh project..."
+          flutter create android_build --template=app --org com.example --project-name buddy_assistant --platforms android -v > create.log 2>&1 || (cat create.log && exit 1)
           
-          # 6. Fail Fast
-          if [ ! -f "build_env/android/app/build.gradle" ]; then
-             echo "CRITICAL: build.gradle is missing. Scaffolding failed."
+          # 3. Verify Scaffolding
+          if [ ! -f "android_build/android/app/build.gradle" ]; then
+             echo "CRITICAL: build.gradle missing!"
+             cat create.log
+             ls -R android_build
              exit 1
           fi
           
-          # 7. Merge Code
-          rm -rf build_env/lib
-          cp -r lib build_env/
-          cp -r assets build_env/
-          cp pubspec.yaml build_env/
+          # 4. Migrate Code (Copy from buddy_assistant -> android_build)
+          echo "Migrating Source Code..."
           
-          # Ensure directories exist
-          mkdir -p build_env/android/app/src/main
+          # Lib
+          rm -rf android_build/lib
+          cp -r buddy_assistant/lib android_build/
           
-          # Merge Native Code
-          cp -r android/app/src/main/* build_env/android/app/src/main/
+          # Assets
+          cp -r buddy_assistant/assets android_build/
           
-          # 8. Inject Dependencies
-          sed -i 's/dependencies {/dependencies {\n    implementation "com.alphacephei:vosk-android:0.3.30"/' build_env/android/app/build.gradle
-          sed -i 's/defaultConfig {/defaultConfig {\n        multiDexEnabled true/' build_env/android/app/build.gradle
+          # Pubspec
+          cp buddy_assistant/pubspec.yaml android_build/
           
-          # 9. Build
-          cd build_env
+          # Native Code configuration
+          mkdir -p android_build/android/app/src/main
+          cp -r buddy_assistant/android/app/src/main/* android_build/android/app/src/main/
+          
+          # 5. Inject Dependencies
+          echo "Injecting Gradle Dependencies..."
+          sed -i 's/dependencies {/dependencies {\n    implementation "com.alphacephei:vosk-android:0.3.30"/' android_build/android/app/build.gradle
+          sed -i 's/defaultConfig {/defaultConfig {\n        multiDexEnabled true/' android_build/android/app/build.gradle
+          
+          # 6. Build
+          echo "Building..."
+          cd android_build
           flutter pub get
           flutter build apk --debug
           
@@ -79,4 +81,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: buddy-assistant-release
-          path: buddy_assistant/build_env/build/app/outputs/flutter-apk/app-debug.apk
+          path: android_build/build/app/outputs/flutter-apk/app-debug.apk
