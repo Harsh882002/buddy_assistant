@@ -13,72 +13,62 @@ jobs:
       
       - uses: actions/setup-java@v3
         with:
-          distribution: 'zulu'
+          distribution: 'temurin'
           java-version: '17'
           
       - uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
+          cache: true
           
-      - name: Setup Tools and Build
+      - name: Build and Verify
         run: |
-          # 1. Setup Environment Variables
-          echo "Configuring Android Environment..."
-          export JAVA_HOME=$JAVA_HOME_17_X64
-          export ANDROID_HOME=$ANDROID_SDK_ROOT
-          export PATH=$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH
-          
-          # 2. Accept Licenses (Force)
-          echo "Accepting Licenses..."
+          # 1. Accept Licenses
           yes | flutter doctor --android-licenses || true
           
-          # 3. Configure Flutter
-          flutter config --no-analytics
+          # 2. Configure Environment
           flutter config --enable-android
-          
-          # 4. Check Doctor (Verbose)
           flutter doctor -v
           
-          # 5. Create Fresh Build Folder
-          echo "Creating fresh_build..."
-          # We try creating it. If Android fails, we will see it in the logs.
-          flutter create fresh_build --org com.example --project-name buddy_assistant --platforms android
+          # 3. Create Project
+          # We purposefully do NOT use "fresh_build" as a name if it causes path issues, 
+          # but we will stick to it for consistency with previous attempts. 'fresh' is cleaner.
+          flutter create fresh --project-name buddy_assistant --platforms android
           
-          # 6. Verify Creation
-          if [ ! -d "fresh_build/android" ]; then
-             echo "#############################################"
-             echo "ERROR: Android folder missing!"
-             echo "Listing fresh_build contents:"
-             ls -R fresh_build
-             echo "#############################################"
+          # 4. Debug Output
+          echo "Checking fresh/android structure:"
+          ls -R fresh/android || echo "Android folder missing!"
+          
+          # 5. Fail Fast
+          if [ ! -f "fresh/android/app/build.gradle" ]; then
+             echo "CRITICAL: build.gradle is missing. Scaffolding failed."
              exit 1
           fi
           
-          # 7. Merge Code
-          echo "Merging code..."
-          rm -rf fresh_build/lib
-          cp -r lib fresh_build/
-          cp -r assets fresh_build/
-          cp pubspec.yaml fresh_build/
+          # 6. Merge Code
+          rm -rf fresh/lib
+          cp -r lib fresh/
+          cp -r assets fresh/
+          cp pubspec.yaml fresh/
           
-          # Ensure target dir exists
-          mkdir -p fresh_build/android/app/src/main
-          # Copy native source
-          cp -r android/app/src/main/* fresh_build/android/app/src/main/
+          # Ensure directories exist
+          mkdir -p fresh/android/app/src/main
           
-          # 8. Inject Dependencies
-          echo "Injecting Gradle dependencies..."
-          sed -i 's/dependencies {/dependencies {\n    implementation "com.alphacephei:vosk-android:0.3.30"/' fresh_build/android/app/build.gradle
-          sed -i 's/defaultConfig {/defaultConfig {\n        multiDexEnabled true/' fresh_build/android/app/build.gradle
+          # Merge Native Code
+          # Using cp -rT to merge contents if supported, or just standard cp -r
+          cp -r android/app/src/main/* fresh/android/app/src/main/
           
-          # 9. Build APK
-          echo "Building APK..."
-          cd fresh_build
+          # 7. Inject Dependencies
+          sed -i 's/dependencies {/dependencies {\n    implementation "com.alphacephei:vosk-android:0.3.30"/' fresh/android/app/build.gradle
+          sed -i 's/defaultConfig {/defaultConfig {\n        multiDexEnabled true/' fresh/android/app/build.gradle
+          
+          # 8. Build
+          cd fresh
           flutter pub get
-          flutter build apk --debug --verbose
+          flutter build apk --debug
           
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: buddy-assistant-release
-          path: buddy_assistant/fresh_build/build/app/outputs/flutter-apk/app-debug.apk
+          path: buddy_assistant/fresh/build/app/outputs/flutter-apk/app-debug.apk
