@@ -31,8 +31,15 @@ jobs:
       
       - name: Setup and Build
         run: |
-          # 1. Create a fresh Flutter project in a temp directory
-          flutter create fresh_build --org com.example --project-name buddy_assistant --platforms android
+          # 0. Configure Flutter to ensure Android is enabled
+          flutter config --enable-android
+          
+          # 1. Create a fresh Flutter project
+          # Removing --platforms flag to let it generate everything default, just in case
+          flutter create fresh_build --org com.example --project-name buddy_assistant
+          
+          # Debug: Check if android folder exists
+          ls -R fresh_build
           
           # 2. Copy OUR code into the fresh project
           # Overwrite lib
@@ -49,6 +56,7 @@ jobs:
           # We primarily want to overwrite AndroidManifest and add our Kotlin files.
           # The structure in our repo: android/app/src/main/...
           # The target: fresh_build/android/app/src/main/...
+          # We force copy to ensure we update the generated files
           cp -r android/app/src/main/* fresh_build/android/app/src/main/
           
           # 3. Inject Dependencies (into the FRESH project)
