@@ -20,61 +20,62 @@ jobs:
         with:
           channel: 'stable'
           
-      - run: flutter pub get
-      
-      # Adding a dummy key.properties if needed, but for debug release it's optional.
-      # We are building release but unsigned (or signed with debug key by default if not specified).
-      # For simplicity we'll let Flutter use the default debug signing for the release build 
-      # or we can just build apk --debug if strict release signing is an issue.
-      # However, "flutter build apk --release" works fine with default keys for personal use.
-      - run: flutter pub get
-      
-      - name: Setup and Build
+      - name: Setup Tools and Build
         run: |
-          # 1. Environment Check
-          echo "Android SDK Root: $ANDROID_SDK_ROOT"
-          echo "Java Home: $JAVA_HOME"
+          # 1. Setup Environment Variables
+          echo "Configuring Android Environment..."
+          export JAVA_HOME=$JAVA_HOME_17_X64
+          export ANDROID_HOME=$ANDROID_SDK_ROOT
+          export PATH=$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH
           
-          # 2. Accept Licenses (Crucial for Android Toolchain)
+          # 2. Accept Licenses (Force)
+          echo "Accepting Licenses..."
           yes | flutter doctor --android-licenses || true
           
-          # 3. Create Project (Verbose to see why Android might be skipped)
+          # 3. Configure Flutter
+          flutter config --no-analytics
           flutter config --enable-android
-          flutter create fresh_build --org com.example --project-name buddy_assistant --platforms android -v
           
-          # Debug: Verify structure
-          echo "Listing fresh_build root:"
-          ls -F fresh_build
+          # 4. Check Doctor (Verbose)
+          flutter doctor -v
           
-          # Fail fast if Android is missing
+          # 5. Create Fresh Build Folder
+          echo "Creating fresh_build..."
+          # We try creating it. If Android fails, we will see it in the logs.
+          flutter create fresh_build --org com.example --project-name buddy_assistant --platforms android
+          
+          # 6. Verify Creation
           if [ ! -d "fresh_build/android" ]; then
-            echo "ERROR: Android folder was NOT created!"
-            exit 1
+             echo "#############################################"
+             echo "ERROR: Android folder missing!"
+             echo "Listing fresh_build contents:"
+             ls -R fresh_build
+             echo "#############################################"
+             exit 1
           fi
           
-          # 4. Copy OUR code into the fresh project
-          # Overwrite lib
+          # 7. Merge Code
+          echo "Merging code..."
           rm -rf fresh_build/lib
           cp -r lib fresh_build/
-          
-          # Copy assets
           cp -r assets fresh_build/
-          
-          # Overwrite pubspec
           cp pubspec.yaml fresh_build/
           
-          # Merge Android Native Code
+          # Ensure target dir exists
+          mkdir -p fresh_build/android/app/src/main
+          # Copy native source
           cp -r android/app/src/main/* fresh_build/android/app/src/main/
           
-          # 3. Inject Dependencies (into the FRESH project)
-          # Now we are sure build.gradle exists because it's a fresh create.
+          # 8. Inject Dependencies
+          echo "Injecting Gradle dependencies..."
           sed -i 's/dependencies {/dependencies {\n    implementation "com.alphacephei:vosk-android:0.3.30"/' fresh_build/android/app/build.gradle
           sed -i 's/defaultConfig {/defaultConfig {\n        multiDexEnabled true/' fresh_build/android/app/build.gradle
           
-          # 4. Build
+          # 9. Build APK
+          echo "Building APK..."
           cd fresh_build
           flutter pub get
-          flutter build apk --debug
+          flutter build apk --debug --verbose
           
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
