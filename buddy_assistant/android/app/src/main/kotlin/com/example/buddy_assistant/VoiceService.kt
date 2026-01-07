@@ -46,8 +46,7 @@ class VoiceService : Service(), RecognitionListener {
         
         val recognizer = Recognizer(model, 16000.0f)
         speechService = SpeechService(recognizer, 16000.0f)
-        speechService?.addListener(this)
-        speechService?.startListening()
+        speechService?.startListening(this)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -67,7 +66,7 @@ class VoiceService : Service(), RecognitionListener {
         
         // Ensure we are listening
         if (speechService != null) {
-            speechService?.startListening()
+            speechService?.startListening(this)
         }
         
         return START_STICKY
