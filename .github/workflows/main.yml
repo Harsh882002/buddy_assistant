@@ -30,31 +30,47 @@ jobs:
       - run: flutter pub get
       
       # SCAFFOLDING MAGIC:
-      # We move our custom code aside, generate a fresh app, and move code back.
-      # This ensures we have all Gradle files without needing Android Studio.
       - name: Scaffold Project
         run: |
+          # Debug initial state
+          ls -R
+          
+          # 1. Back up our custom code
           mkdir temp_custom
           mv lib temp_custom/
           mv android temp_custom/
           mv pubspec.yaml temp_custom/
           mv assets temp_custom/
           
-          # Create fresh flutter app
-          flutter create . --org com.example --project-name buddy_assistant
+          # 2. Scaffolding: Create fresh flutter app
+          flutter create . --org com.example --project-name buddy_assistant --platforms android
           
-          # Remove generated lib and test
+          # Debug after scaffold
+          ls -R
+          
+          # 3. Clean generic code
           rm -rf lib test
           
-          # Restore our code (merges android folder)
-          cp -r temp_custom/* .
+          # 4. Restore/Merge our code
+          # Restore lib (folder replacement)
+          cp -r temp_custom/lib .
+          # Restore assets (folder replacement)
+          cp -r temp_custom/assets .
+          # Restore pubspec (file replacement)
+          cp temp_custom/pubspec.yaml .
+          
+          # Merge Android (files inside folders)
+          # We copy contents of temp_custom/android into current android/
+          cp -r temp_custom/android/. android/
           
       # DEPENDENCY INJECTION:
-      # We need Vosk in the native Gradle file.
       - name: Inject Vosk Dependency
         run: |
+          # Verify file exists
+          ls -l android/app/build.gradle
+          
+          # Inject Dependencies
           sed -i 's/dependencies {/dependencies {\n    implementation "com.alphacephei:vosk-android:0.3.30"/' android/app/build.gradle
-          # Enable MultiDex if needed (usually fine for small apps, but Vosk is big)
           sed -i 's/defaultConfig {/defaultConfig {\n        multiDexEnabled true/' android/app/build.gradle
 
       - run: flutter pub get
