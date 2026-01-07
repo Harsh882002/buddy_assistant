@@ -23,47 +23,54 @@ jobs:
           
       - name: Build and Verify
         run: |
-          # 1. Accept Licenses
+          # 1. Setup Android SDK Tools explicitly
+          # Ubuntu runners have SDK, but sometimes missing specific tools Flutter wants.
+          echo "Updating Android SDK..."
+          yes | sdkmanager --install "platform-tools" "platforms;android-34" "build-tools;34.0.0"
+          
+          # 2. Accept Licenses
           yes | flutter doctor --android-licenses || true
           
-          # 2. Configure Environment
+          # 3. Precache Android Artifacts (Forces Flutter to download Gradle wrapper etc)
+          flutter precache --android
+          
+          # 4. Configure Environment
+          flutter config --no-analytics
           flutter config --enable-android
           flutter doctor -v
           
-          # 3. Create Project
-          # We purposefully do NOT use "fresh_build" as a name if it causes path issues, 
-          # but we will stick to it for consistency with previous attempts. 'fresh' is cleaner.
-          flutter create fresh --project-name buddy_assistant --platforms android
+          # 5. Create Project (Explicitly 'app' template)
+          # We use a standard name 'build_env'
+          flutter create build_env --template=app --org com.example --project-name buddy_assistant --platforms android
           
-          # 4. Debug Output
-          echo "Checking fresh/android structure:"
-          ls -R fresh/android || echo "Android folder missing!"
+          # 6. Debug Output
+          echo "Checking build_env/android structure:"
+          ls -R build_env/android || echo "Android folder missing!"
           
-          # 5. Fail Fast
-          if [ ! -f "fresh/android/app/build.gradle" ]; then
+          # 7. Fail Fast
+          if [ ! -f "build_env/android/app/build.gradle" ]; then
              echo "CRITICAL: build.gradle is missing. Scaffolding failed."
              exit 1
           fi
           
-          # 6. Merge Code
-          rm -rf fresh/lib
-          cp -r lib fresh/
-          cp -r assets fresh/
-          cp pubspec.yaml fresh/
+          # 8. Merge Code
+          rm -rf build_env/lib
+          cp -r lib build_env/
+          cp -r assets build_env/
+          cp pubspec.yaml build_env/
           
           # Ensure directories exist
-          mkdir -p fresh/android/app/src/main
+          mkdir -p build_env/android/app/src/main
           
           # Merge Native Code
-          # Using cp -rT to merge contents if supported, or just standard cp -r
-          cp -r android/app/src/main/* fresh/android/app/src/main/
+          cp -r android/app/src/main/* build_env/android/app/src/main/
           
-          # 7. Inject Dependencies
-          sed -i 's/dependencies {/dependencies {\n    implementation "com.alphacephei:vosk-android:0.3.30"/' fresh/android/app/build.gradle
-          sed -i 's/defaultConfig {/defaultConfig {\n        multiDexEnabled true/' fresh/android/app/build.gradle
+          # 9. Inject Dependencies
+          sed -i 's/dependencies {/dependencies {\n    implementation "com.alphacephei:vosk-android:0.3.30"/' build_env/android/app/build.gradle
+          sed -i 's/defaultConfig {/defaultConfig {\n        multiDexEnabled true/' build_env/android/app/build.gradle
           
-          # 8. Build
-          cd fresh
+          # 10. Build
+          cd build_env
           flutter pub get
           flutter build apk --debug
           
@@ -71,4 +78,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: buddy-assistant-release
-          path: buddy_assistant/fresh/build/app/outputs/flutter-apk/app-debug.apk
+          path: buddy_assistant/build_env/build/app/outputs/flutter-apk/app-debug.apk
